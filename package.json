@@ -20,6 +20,7 @@
   },
   "homepage": "https://github.com/Deekshith1804/gnss2#readme",
   "dependencies": {
+    "cors": "^2.8.5",
     "dotenv": "^17.0.0",
     "express": "^5.1.0"
   }
