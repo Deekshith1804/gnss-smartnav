@@ -24,6 +24,7 @@
     "dotenv": "^17.0.0",
     "express": "^5.1.0",
     "morgan": "^1.10.0",
-    "swagger-ui-express": "^5.0.1"
+    "swagger-ui-express": "^5.0.1",
+    "yaml": "^2.8.0"
   }
 }
