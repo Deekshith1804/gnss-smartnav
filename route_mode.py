@@ -8,7 +8,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 ORS_API_KEY = os.getenv("ORS_API_KEY")
-DIGIPIN_URL = os.getenv("DIGIPIN_URL", "http://localhost:5050/api/digipin/encode")
+DIGIPIN_URL = os.getenv("DIGIPIN_URL", "https://gnss-smartnav-1.onrender.com/api/digipin/encode")
+
 
 def fetch_location_suggestions(query):
     if not query or not ORS_API_KEY:

@@ -14,7 +14,8 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report
 
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
-DIGIPIN_URL = os.getenv("DIGIPIN_URL", "http://localhost:5050/api/digipin/encode")
+DIGIPIN_URL = os.getenv("DIGIPIN_URL", "https://gnss-smartnav-1.onrender.com/api/digipin/encode")
+
 
 def seeded_rng(lat, lon, dt):
     seed = int(lat * 1000 + lon * 1000 + dt.timestamp()) % 100000
