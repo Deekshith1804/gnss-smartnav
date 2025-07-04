@@ -72,12 +72,14 @@ def geocode_place(place: str):
 def fetch_digipin(lat, lon):
     try:
         r = requests.get(DIGIPIN_URL, params={"latitude": lat, "longitude": lon}, timeout=5)
+        print("🌐 Digipin request URL:", r.url)
+        print("🌐 Digipin response:", r.text)
         r.raise_for_status()
         return r.json().get("digipin")
-        print("Requesting Digipin:", r.url)
-        print("Response:", r.text)
-    except:
+    except Exception as e:
+        print("❌ Digipin fetch failed:", e)
         return None
+
 
 def show_location_mode():
     st.title("📡 GNSS Outage Prediction")
