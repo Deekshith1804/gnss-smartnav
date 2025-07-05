@@ -12,11 +12,14 @@ from geopy.geocoders import Nominatim
 from streamlit_folium import st_folium
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report
+from geolocator import get_user_location  # ✅ Added JS-based location access
 
 # Load API Keys
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 DIGIPIN_URL = os.getenv("DIGIPIN_URL", "https://gnss-smartnav-1.onrender.com/api/digipin/encode")
 
+
+# --- Utilities ---
 def seeded_rng(lat, lon, dt):
     seed = int(lat * 1000 + lon * 1000 + dt.timestamp()) % 100000
     return np.random.default_rng(seed)
@@ -84,16 +87,34 @@ def fetch_digipin(lat, lon):
         print("❌ Digipin fetch failed:", e)
         return None
 
+
+# --- Main App ---
 def show_location_mode():
     st.title("📡 GNSS Outage Prediction")
     if "trigger" not in st.session_state:
         st.session_state.trigger = False
 
     st.sidebar.header("🔎 Location & Forecast Time")
-    location_input = st.sidebar.text_input("Location (search required)", "")
+    location_input = st.sidebar.text_input("Enter a location", "")
+    use_gps = st.sidebar.button("📍 Use My Location")
     n_pts = st.sidebar.slider("Simulation Points", 500, 5000, 2000, step=500)
 
-    if location_input and st.sidebar.button("🔍 Fetch Available Times"):
+    # --- Get user location via browser ---
+    if use_gps:
+        coords = get_user_location()
+        if coords:
+            lat, lon = coords
+            place_name = "Your Location"
+            pin = fetch_digipin(lat, lon)
+            st.session_state["loc"] = (lat, lon, place_name, pin)
+            st.session_state["weather_df"] = fetch_openweather(lat, lon)
+            st.session_state["kp_df"] = fetch_kp()
+            st.session_state.prediction_done = False
+        else:
+            st.error("⚠️ Unable to detect your location. Please allow location access in your browser.")
+
+    # --- Manual location input ---
+    elif location_input and st.sidebar.button("🔍 Fetch Available Times"):
         geo = geocode_place(location_input)
         if geo:
             lat, lon, place_name = geo
@@ -104,9 +125,10 @@ def show_location_mode():
             st.session_state.prediction_done = False
 
     if "weather_df" not in st.session_state:
-        st.info("📍 Enter a location and click 'Fetch Available Times'")
+        st.info("📍 Enter a location or use GPS to begin.")
         return
 
+    # Forecast selection
     times = st.session_state.weather_df["time"].dt.strftime('%Y-%m-%d %H:%M').tolist()
     dt_sel = pd.to_datetime(st.sidebar.selectbox("Select Forecast Time (UTC)", times))
 
@@ -162,10 +184,13 @@ def show_location_mode():
         <b>🧲 Kp Index:</b> {p['kp']}<br>
         <b>Status:</b> {'<span style="color:red"><b>🔴 GNSS Outage</b></span>' if p['outage'] else '<span style="color:green"><b>🟢 No Outage</b></span>'}
     </div>""", max_width=300)
-    folium.Marker([p["lat"], p["lon"]], popup=popup, icon=folium.Icon(color="red" if p["outage"] else "green", icon="signal", prefix="fa")).add_to(m)
+    folium.Marker([p["lat"], p["lon"]], popup=popup,
+                  icon=folium.Icon(color="red" if p["outage"] else "green", icon="signal", prefix="fa")).add_to(m)
+
     st_folium(m, width=1100, height=600)
 
     if st.sidebar.checkbox("Show Simulated Points Table"):
         st.dataframe(p["sim"])
 
-    st.sidebar.download_button("⬇️ Download Simulated Outages", data=p["sim"].to_csv(index=False), file_name="gnss_outages.csv", mime="text/csv")
+    st.sidebar.download_button("⬇️ Download Simulated Outages", data=p["sim"].to_csv(index=False),
+                               file_name="gnss_outages.csv", mime="text/csv")
