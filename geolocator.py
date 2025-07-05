@@ -1,31 +1,22 @@
+import streamlit as st
 from streamlit_javascript import st_javascript
 
 def get_user_location():
     result = st_javascript("""
-        async () => {
-            if (!navigator.geolocation) {
-                alert("Geolocation is not supported by your browser.");
-                return "";
-            }
-
-            return new Promise((resolve, reject) => {
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        const coords = position.coords.latitude + "," + position.coords.longitude;
-                        resolve(coords);
-                    },
-                    (err) => {
-                        alert("⚠️ Please allow location access in your browser to use this feature.");
-                        resolve("");
-                    }
-                );
-            });
+    navigator.geolocation.getCurrentPosition(
+        (loc) => {
+            const coords = loc.coords.latitude + "," + loc.coords.longitude;
+            window.parent.postMessage({type: "streamlit:setComponentValue", value: coords}, "*");
+        },
+        (err) => {
+            console.warn("Error getting location", err);
+            window.parent.postMessage({type: "streamlit:setComponentValue", value: ""}, "*");
         }
+    );
     """)
-
-    if result and "," in result:
+    if result:
         try:
-            lat, lon = map(float, result.split(","))
+            lat, lon = map(float, result.split(','))
             return lat, lon
         except:
             return None
