@@ -12,12 +12,10 @@ from geopy.geocoders import Nominatim
 from streamlit_folium import st_folium
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report
-from geolocator import get_user_location  # ✅ Added JS-based location access
 
 # Load API Keys
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 DIGIPIN_URL = os.getenv("DIGIPIN_URL", "https://gnss-smartnav-1.onrender.com/api/digipin/encode")
-
 
 # --- Utilities ---
 def seeded_rng(lat, lon, dt):
@@ -26,17 +24,17 @@ def seeded_rng(lat, lon, dt):
 
 def get_fixed_values(lat, lon, dt):
     rng = seeded_rng(lat, lon, dt)
-    return rng.uniform(0,100), rng.exponential(scale=2), rng.uniform(20,80), rng.integers(0,10)
+    return rng.uniform(0, 100), rng.exponential(scale=2), rng.uniform(20, 80), rng.integers(0, 10)
 
 def simulate_points(n, lat, lon, dt):
     rng = seeded_rng(lat, lon, dt)
     return pd.DataFrame({
-        "lat": rng.uniform(lat-5, lat+5,n),
-        "lon": rng.uniform(lon-5, lon+5,n),
-        "cloud": rng.uniform(0,100,n),
+        "lat": rng.uniform(lat - 5, lat + 5, n),
+        "lon": rng.uniform(lon - 5, lon + 5, n),
+        "cloud": rng.uniform(0, 100, n),
         "rain": rng.exponential(scale=2, size=n),
-        "tec": rng.uniform(20,80,n),
-        "kp": rng.integers(0,10,n)
+        "tec": rng.uniform(20, 80, n),
+        "kp": rng.integers(0, 10, n)
     })
 
 def predict_outage(cloud, rain, tec, kp):
@@ -71,7 +69,7 @@ def geocode_place(place: str):
         try:
             loc = geolocator.geocode(query, timeout=10)
             if loc:
-                return loc.latitude, loc.longitude, loc.raw.get("display_name","").split(",")[0]
+                return loc.latitude, loc.longitude, loc.raw.get("display_name", "").split(",")[0]
         except (GeocoderTimedOut, GeocoderUnavailable):
             continue
     return None
@@ -79,14 +77,11 @@ def geocode_place(place: str):
 def fetch_digipin(lat, lon):
     try:
         r = requests.get(DIGIPIN_URL, params={"latitude": lat, "longitude": lon}, timeout=10)
-        print("🌐 Digipin request URL:", r.url)
-        print("🌐 Digipin response:", r.text)
         r.raise_for_status()
         return r.json().get("digipin")
     except Exception as e:
         print("❌ Digipin fetch failed:", e)
         return None
-
 
 # --- Main App ---
 def show_location_mode():
@@ -96,25 +91,9 @@ def show_location_mode():
 
     st.sidebar.header("🔎 Location & Forecast Time")
     location_input = st.sidebar.text_input("Enter a location", "")
-    use_gps = st.sidebar.button("📍 Use My Location")
     n_pts = st.sidebar.slider("Simulation Points", 500, 5000, 2000, step=500)
 
-    # --- Get user location via browser ---
-    if use_gps:
-        coords = get_user_location()
-        if coords:
-            lat, lon = coords
-            place_name = "Your Location"
-            pin = fetch_digipin(lat, lon)
-            st.session_state["loc"] = (lat, lon, place_name, pin)
-            st.session_state["weather_df"] = fetch_openweather(lat, lon)
-            st.session_state["kp_df"] = fetch_kp()
-            st.session_state.prediction_done = False
-        else:
-            st.error("⚠️ Unable to detect your location. Please allow location access in your browser.")
-
-    # --- Manual location input ---
-    elif location_input and st.sidebar.button("🔍 Fetch Available Times"):
+    if location_input and st.sidebar.button("🔍 Fetch Available Times"):
         geo = geocode_place(location_input)
         if geo:
             lat, lon, place_name = geo
@@ -123,12 +102,13 @@ def show_location_mode():
             st.session_state["weather_df"] = fetch_openweather(lat, lon)
             st.session_state["kp_df"] = fetch_kp()
             st.session_state.prediction_done = False
+        else:
+            st.error("❌ Could not find that location. Try a nearby city or check spelling.")
 
     if "weather_df" not in st.session_state:
-        st.info("📍 Enter a location or use GPS to begin.")
+        st.info("📍 Enter a location to begin.")
         return
 
-    # Forecast selection
     times = st.session_state.weather_df["time"].dt.strftime('%Y-%m-%d %H:%M').tolist()
     dt_sel = pd.to_datetime(st.sidebar.selectbox("Select Forecast Time (UTC)", times))
 
@@ -147,7 +127,11 @@ def show_location_mode():
             "dt": dt_sel, "cloud": cloud, "rain": rain,
             "tec": tec_now, "kp": kp_now, "outage": outage,
             "sim": sim,
-            "model_report": classification_report(train["outage"], model.predict(train[["cloud", "rain", "tec", "kp"]]), zero_division=0)
+            "model_report": classification_report(
+                train["outage"],
+                model.predict(train[["cloud", "rain", "tec", "kp"]]),
+                zero_division=0
+            )
         }
         st.session_state.prediction_done = True
 
@@ -171,7 +155,8 @@ def show_location_mode():
 
     st.subheader("🗺️ Predicted GNSS Outages (Heatmap)")
     m = folium.Map(location=[p["lat"], p["lon"]], zoom_start=6)
-    HeatMap(p["sim"][p["sim"]["out_ml"] == 1][["lat", "lon"]].values.tolist(), radius=12, blur=18, min_opacity=0.5).add_to(m)
+    HeatMap(p["sim"][p["sim"]["out_ml"] == 1][["lat", "lon"]].values.tolist(),
+            radius=12, blur=18, min_opacity=0.5).add_to(m)
 
     popup = folium.Popup(f"""
     <div style="font-family:Arial; font-size:13px; line-height:1.5">
